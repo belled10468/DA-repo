@@ -49,16 +49,16 @@ public class Parser {
     public Parser(String fileName) {
         System.out.println("File to parse : " + fileName);
         WordAnalyzer wa = new WordAnalyzer();
-
-        String equation = "id+id*id";
+        ArrayList solvedResult = new ArrayList();
+        String equation = "id+id+id";
 
         try {
-         wa.lex(FileInput.readFile(fileName.trim()));
-         } catch (Exception e) {
-         System.out.println("File address error! show the default file");
-         equation = FileInput.readFile("./file.txt");
-         }
-        this.analyzedEquation = wa.lex(equation);
+            solvedResult = wa.lex(FileInput.readFile(fileName.trim()).replace("$", ""));
+        } catch (Exception e) {
+            System.out.println("File address error! show the default file");
+            equation = FileInput.readFile("./file.txt");
+        }
+        this.analyzedEquation = solvedResult;
         this.analyzedEquation.add(new LexemeUnit("$", 0));
         initialize();
     }
@@ -74,14 +74,14 @@ public class Parser {
      * Dummy code
      */
     public void printParseTree() {
-       // System.out.println("Hello World from " + getClass().getName());
+        // System.out.println("Hello World from " + getClass().getName());
 
         int currentLevel = 0;
         for (char c : mainTreeStack.getParseTreeStack().toCharArray()) {
-            
+
             switch (c) {
                 case '[':
-                   currentLevel++;
+                    currentLevel++;
                     break;
                 case ']':
                     currentLevel--;
@@ -98,22 +98,23 @@ public class Parser {
                     printNode("F", currentLevel);
                     break;
                 case 'i':
-                    printNode("id", currentLevel + 1 );
+                    printNode("id", currentLevel + 1);
                     break;
                 case 'd':
                     break;
                 default:
                     printNode(String.valueOf(c), currentLevel + 1);
                     break;
-                    
+
             }
-            
+
         }
         System.out.println("$");
 
     }
-    public void printNode(String str,int currentLevel){
-        for(int i = 1; i < currentLevel; i++){
+
+    public void printNode(String str, int currentLevel) {
+        for (int i = 1; i < currentLevel; i++) {
             System.out.print("\t");
         }
         System.out.println(str);
@@ -127,9 +128,14 @@ public class Parser {
         do {
             ParseInfo parseInfo = new ParseInfo();
             ActionLookupPair actionLookupUnit = new ActionLookupPair();
+            boolean isRightParenthese = false;
 
             parseInfo.setStack(getArrayListString(stack));
             parseInfo.setInputTokens(getArrayListString(analyzedEquation));
+
+            if (stack.get(stack.size() - 1).toString().equals("11")) {
+                isRightParenthese = true;
+            }
 
             String LastActionValue = actionValue;
 
@@ -139,10 +145,10 @@ public class Parser {
 
             switch ((actionValue.toCharArray())[0]) {
                 case 'S':
-                    shift(Integer.valueOf(String.valueOf(actionValue.toCharArray()[1])), actionLookupUnit, parseInfo);
+                    shift(Integer.valueOf(String.valueOf(actionValue.substring(1))), actionLookupUnit, parseInfo);
                     break;
                 case 'R':
-                    reduce(Integer.valueOf(String.valueOf(actionValue.toCharArray()[1])), actionLookupUnit, parseInfo);
+                    reduce(Integer.valueOf(String.valueOf(actionValue.substring(1))), actionLookupUnit, parseInfo);
                     break;
                 default:
                     break;
@@ -159,12 +165,20 @@ public class Parser {
                     mainTreeStack.insert(currentActionPair);
                 } else if (lu.getName().equals("F")) {
                     ArrayList currentTreeStack = mainTreeStack.getTreeStack();
-
-                    for (Object o : currentTreeStack.toArray()) {
+                    Object[] objectList = currentTreeStack.toArray();
+                    for (Object o : objectList) {
                         if (o instanceof ActionLookupPair) {
                             ArrayList FStack = new ArrayList();
                             FStack.add(currentActionPair);
                             FStack.add(o);
+                            currentTreeStack.add(currentTreeStack.indexOf(o), FStack);
+                            currentTreeStack.remove(o);
+                        } else if (o instanceof ArrayList && isRightParenthese) {
+                            ArrayList FStack = new ArrayList();
+                            FStack.add(currentActionPair);
+                            FStack.add(new ActionLookupPair(8, new LexemeUnit(")", 25)));
+                            FStack.add(o);
+                            FStack.add(new ActionLookupPair(11, new LexemeUnit(")", 26)));
                             currentTreeStack.add(currentTreeStack.indexOf(o), FStack);
                             currentTreeStack.remove(o);
                         }
@@ -172,7 +186,8 @@ public class Parser {
                 } else if (actionLookupUnit.getToken().getToken() != 0) {
                     if (lu.getName().equals("T")) {
                         ArrayList currentTreeStack = mainTreeStack.getTreeStack();
-                        for (Object o : currentTreeStack.toArray()) {
+                        Object[] objectList = currentTreeStack.toArray();
+                        for (Object o : objectList) {
                             ArrayList arr = (ArrayList) o;
                             if ((arr).size() == 2) {
                                 ActionLookupPair a = (ActionLookupPair) arr.get(0);
@@ -187,16 +202,32 @@ public class Parser {
                         }
                     } else if (lu.getName().equals("E")) {
                         ArrayList currentTreeStack = mainTreeStack.getTreeStack();
-                        for (Object o : currentTreeStack) {
+                        Object[] objectList = currentTreeStack.toArray();
+                        for (Object o : objectList) {
                             ArrayList arr = (ArrayList) o;
                             if ((arr).size() == 2) {
                                 ActionLookupPair a = (ActionLookupPair) arr.get(0);
                                 if (a.getToken().getName().equals("T")) {
-                                    ArrayList EStack = new ArrayList();
-                                    EStack.add(arr);
-                                    EStack.add(0, currentActionPair);
-                                    currentTreeStack.add(currentTreeStack.indexOf(arr), EStack);
-                                    currentTreeStack.remove(arr);
+                                    ArrayList newCombineStack = new ArrayList();
+                                    if (tempStack.size() >= 5 && tempStack.get(tempStack.size() - 4).toString().equals(currentActionPair.getToken().getName().toString())) {
+                                        ActionLookupPair newALP = new ActionLookupPair(Integer.valueOf(tempStack.get(tempStack.size() - 1).toString()), (LexemeUnit) tempStack.get(tempStack.size() - 2));
+
+                                        newCombineStack.add(currentActionPair);
+                                        newCombineStack.add(currentTreeStack.get(1));
+                                        //get current Variable and the tempstacks
+                                        newCombineStack.add(newALP);
+                                        newCombineStack.add(currentTreeStack.get(0));
+                                        //remove
+                                        tempStack = new ArrayList(tempStack.subList(0, tempStack.size() - 4));
+                                        currentTreeStack = new ArrayList(currentTreeStack.subList(2, currentTreeStack.size()));
+                                        currentTreeStack.add(0, newCombineStack);
+                                        mainTreeStack.setTreeStack(currentTreeStack);
+                                    } else {
+                                        newCombineStack.add(arr);
+                                        newCombineStack.add(0, currentActionPair);                                       
+                                        currentTreeStack.add(currentTreeStack.indexOf(arr), newCombineStack);
+                                        currentTreeStack.remove(arr);
+                                    }
                                 }
                             }
                         }
@@ -205,12 +236,24 @@ public class Parser {
 
                     ArrayList newCombineStack = new ArrayList();
                     ArrayList currentTreeStack = mainTreeStack.getTreeStack();
-                    newCombineStack.add(currentActionPair);
-                    newCombineStack.add(currentTreeStack.get(1));
-                    newCombineStack.add(new ActionLookupPair((Integer) tempStack.get(tempStack.size() - 1), (LexemeUnit) tempStack.get(tempStack.size() - 2)));
-                    newCombineStack.add(currentTreeStack.get(0));
-                    tempStack = new ArrayList(tempStack.subList(0, tempStack.size() - 4));
-                    currentTreeStack = new ArrayList(currentTreeStack.subList(2, currentTreeStack.size()));
+                    ActionLookupPair newALP = null;
+                    if (tempStack.size() >= 2) {
+                        newALP = new ActionLookupPair(Integer.valueOf(tempStack.get(tempStack.size() - 1).toString()), (LexemeUnit) tempStack.get(tempStack.size() - 2));
+                    }
+                    if (newALP != null && currentActionPair.getToken().getName().equals(tempStack.get(tempStack.size() - 4).toString())) {
+                        newCombineStack.add(currentActionPair);
+                        newCombineStack.add(currentTreeStack.get(1));
+                        //get current Variable and the tempstacks
+                        newCombineStack.add(newALP);
+                        newCombineStack.add(currentTreeStack.get(0));
+                        //remove
+                        tempStack = new ArrayList(tempStack.subList(0, tempStack.size() - 4));
+                        currentTreeStack = new ArrayList(currentTreeStack.subList(2, currentTreeStack.size()));
+                    } else {
+                        newCombineStack.add(currentActionPair);
+                        newCombineStack.add(currentTreeStack.get(0));
+                        currentTreeStack = new ArrayList(currentTreeStack.subList(1, currentTreeStack.size()));
+                    }
                     currentTreeStack.add(0, newCombineStack);
 
                     mainTreeStack.setTreeStack(currentTreeStack);
@@ -352,7 +395,7 @@ public class Parser {
         actionTable[5] = new String[]{"", "R6", "R6", "", "R6", "R6"};
         actionTable[6] = new String[]{"S5", "", "", "S4", "", ""};
         actionTable[7] = new String[]{"S5", "", "", "S4", "", ""};
-        actionTable[8] = new String[]{"", "S6", "", "S11", "", ""};
+        actionTable[8] = new String[]{"", "S6", "", "", "S11", ""};
         actionTable[9] = new String[]{"", "R1", "S7", "", "R1", "R1"};
         actionTable[10] = new String[]{"", "R3", "R3", "", "R3", "R3"};
         actionTable[11] = new String[]{"", "R5", "R5", "", "R5", "R5"};

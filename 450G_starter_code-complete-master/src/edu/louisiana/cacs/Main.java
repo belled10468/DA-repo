@@ -8,7 +8,7 @@ public class Main{
         System.out.println("Hello World from Main");
         
         
-        Parser myParser = new Parser(args[0]);       
+        Parser myParser = new Parser(args[0]);      
         
         myParser.parse();
     }
